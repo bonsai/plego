@@ -1,0 +1,13 @@
+pipeline:
+  source:
+    module: filesystem
+    path: G:/My Drive/wiki
+    extensions: [.md, .txt]
+
+  outputs:
+    - module: gmail
+      to: onsen.bonsai@gmail.com
+      credentials: ./credentials.json
+      token: ~/.plego/gmail-token.json
+
+  state_db: ~/.plego/state.db
