@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
+	"unicode"
 
 	"github.com/dance/plego/auth"
 	"github.com/dance/plego/core"
@@ -18,37 +20,47 @@ var gmailScopes = []string{
 	"https://www.googleapis.com/auth/gmail.compose",
 }
 
-type Output struct {
+type Publish struct {
 	To              string
 	CredentialsFile string
 	TokenFile       string
 
-	// oauth is initialized during InitAuth
 	oauth *auth.OAuthHandler
 	cfg   *oauth2.Config
 }
 
-func (o *Output) Name() string { return "gmail" }
+func (p *Publish) Name() string { return "Publish::Gmail" }
 
-func (o *Output) InitAuth(ctx context.Context) error {
-	handler, err := auth.NewGoogleOAuth(o.CredentialsFile, o.TokenFile, o.Name(), gmailScopes)
+func (p *Publish) InitAuth(ctx context.Context) error {
+	handler, err := auth.NewGoogleOAuth(p.CredentialsFile, p.TokenFile, p.Name(), gmailScopes)
 	if err != nil {
 		return err
 	}
-	o.oauth = handler
-	o.cfg = handler.Config
+	p.oauth = handler
+	p.cfg = handler.Config
 	_, err = handler.Token(ctx)
 	return err
 }
 
-func (o *Output) Publish(ctx context.Context, item core.Item) error {
-	client, err := o.httpClient(ctx)
+func encodeSubject(subject string) string {
+	for _, r := range subject {
+		if r > unicode.MaxASCII {
+			return mime.BEncoding.Encode("utf-8", subject)
+		}
+	}
+	return subject
+}
+
+func (p *Publish) Publish(ctx context.Context, entry *core.Entry) error {
+	client, err := p.httpClient(ctx)
 	if err != nil {
 		return err
 	}
 
-	raw := fmt.Sprintf("To: %s\r\nSubject: %s\r\n\r\n%s", o.To, item.Title, item.Body)
-	encoded := base64.URLEncoding.EncodeToString([]byte(raw))
+	subject := encodeSubject(entry.Title)
+	raw := fmt.Sprintf("To: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s",
+		p.To, subject, entry.Body)
+	encoded := base64.RawURLEncoding.EncodeToString([]byte(raw))
 
 	body, _ := json.Marshal(map[string]any{
 		"message": map[string]string{"raw": encoded},
@@ -72,13 +84,13 @@ func (o *Output) Publish(ctx context.Context, item core.Item) error {
 	return nil
 }
 
-func (o *Output) httpClient(ctx context.Context) (*http.Client, error) {
-	tok, err := o.oauth.Token(ctx)
+func (p *Publish) httpClient(ctx context.Context) (*http.Client, error) {
+	tok, err := p.oauth.Token(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return o.cfg.Client(ctx, tok), nil
+	return p.cfg.Client(ctx, tok), nil
 }
 
-var _ core.Output = (*Output)(nil)
-var _ core.Authorizer = (*Output)(nil)
+var _ core.Publish = (*Publish)(nil)
+var _ core.Authorizer = (*Publish)(nil)

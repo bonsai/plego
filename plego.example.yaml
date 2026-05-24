@@ -1,29 +1,46 @@
-# Example Plego config with OAuth fallback
-
-pipeline:
-  # Global state database (optional, defaults to ~/.plego/state.db)
+global:
+  timezone: Asia/Tokyo
   state_db: ~/.plego/state.db
 
-  # Input source (filesystem example)
-  source:
-    module: filesystem
-    path: ./inbox
-    extensions:
-      - .txt
-      - .md
+plugins:
+  # --- Subscription plugins (input) ---
 
-  # Output plugins
-  outputs:
-    # Gmail output with OAuth fallback
-    # Tries: token file → GMAIL_TOKEN env var → interactive OAuth
-    - module: gmail
+  # Filesystem: watch local files
+  - module: Subscription::Filesystem
+    config:
+      path: ./inbox
+      extensions:
+        - .txt
+        - .md
+
+  # Google Drive: fetch a specific file
+  # - module: Subscription::GoogleDrive
+  #   config:
+  #     fileId: "your_bookmark_file_id"
+  #     credentials: ~/.config/google/credentials.json
+
+  # --- Filter plugins (transform) ---
+
+  # Dedup: skip already-processed entries
+  - module: Filter::Deduped
+
+  # Ghwl: convert HTML to plain text (requires ghwl in PATH)
+  # - module: Filter::Ghwl
+  #   config:
+  #     cmd: ghwl
+  #     timeout: 30
+
+  # --- Publish plugins (output) ---
+
+  # Gmail: create a draft
+  - module: Publish::Gmail
+    config:
       to: recipient@example.com
       credentials: ~/.config/google/credentials.json
-      # Optional: custom token location (defaults to ~/.plego/gmail-token.json)
-      # token: ~/.plego/gmail-token.json
 
-    # Example: Multiple outputs (all get auth fallback)
-    # - module: slack
-    #   to: "#notifications"
-    #   credentials: ~/.config/slack/credentials.json
-    #   # Falls back to SLACK_TOKEN env var
+  # Google Drive: save to a folder
+  # - module: Publish::GoogleDrive
+  #   config:
+  #     folderId: "your_output_folder_id"
+  #     fileNamePrefix: bookmark-
+  #     credentials: ~/.config/google/credentials.json

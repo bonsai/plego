@@ -7,40 +7,76 @@ import (
 )
 
 type Pipeline struct {
-	Source  Source
-	Outputs []Output
-	State   StateStore
+	Subscription Subscription
+	Filters      []Filter
+	Publishes    []Publish
+	State        StateStore
 }
 
 func (p *Pipeline) Run(ctx context.Context) error {
-	items, err := p.Source.Items(ctx)
+	feeds, err := p.Subscription.Fetch(ctx)
 	if err != nil {
-		return fmt.Errorf("source %s: %w", p.Source.Name(), err)
+		return fmt.Errorf("subscription %s: %w", p.Subscription.Name(), err)
 	}
 
-	log.Printf("[%s] %d items found", p.Source.Name(), len(items))
+	var entries []*Entry
+	for _, feed := range feeds {
+		log.Printf("[%s] feed: %s (%d entries)", p.Subscription.Name(), feed.Title, len(feed.Entries))
+		entries = append(entries, feed.Entries...)
+	}
 
-	sent, skipped := 0, 0
-	for _, item := range items {
-		if p.State.IsSent(item.ID) {
+	log.Printf("[%s] total %d entries", p.Subscription.Name(), len(entries))
+
+	sent, skipped, dropped := 0, 0, 0
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+
+		guid := entry.GUID
+		if guid == "" {
+			guid = entry.URL
+		}
+
+		if p.State != nil && p.State.IsSent(guid) {
 			skipped++
 			continue
 		}
 
-		for _, out := range p.Outputs {
-			if err := out.Publish(ctx, item); err != nil {
-				log.Printf("[%s] publish error for %q: %v", out.Name(), item.Title, err)
-				continue
+		current := entry
+		for _, filter := range p.Filters {
+			var err error
+			current, err = filter.Filter(ctx, current)
+			if err != nil {
+				log.Printf("[%s] filter error for %q: %v", filter.Name(), entry.Title, err)
+				break
 			}
-			log.Printf("[%s] published: %s", out.Name(), item.Title)
+			if current == nil {
+				dropped++
+				log.Printf("[%s] dropped: %s", filter.Name(), entry.Title)
+				break
+			}
+		}
+		if current == nil {
+			continue
 		}
 
-		if err := p.State.MarkSent(item.ID); err != nil {
-			log.Printf("state update error: %v", err)
+		for _, pub := range p.Publishes {
+			if err := pub.Publish(ctx, current); err != nil {
+				log.Printf("[%s] publish error for %q: %v", pub.Name(), current.Title, err)
+				continue
+			}
+			log.Printf("[%s] published: %s", pub.Name(), current.Title)
+		}
+
+		if p.State != nil {
+			if err := p.State.MarkSent(guid); err != nil {
+				log.Printf("state update error: %v", err)
+			}
 		}
 		sent++
 	}
 
-	log.Printf("done: %d sent, %d skipped", sent, skipped)
+	log.Printf("done: %d sent, %d skipped, %d dropped", sent, skipped, dropped)
 	return nil
 }
