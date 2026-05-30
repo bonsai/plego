@@ -101,9 +101,10 @@ func (h *OAuthHandler) interactiveAuth(ctx context.Context) (*oauth2.Token, erro
 	fmt.Printf("Paste authorization code: ")
 
 	var code string
-	if _, err := fmt.Scanln(&code); err != nil {
+	if _, err := fmt.Scan(&code); err != nil {
 		return nil, fmt.Errorf("read auth code: %w", err)
 	}
+	code = strings.TrimSpace(code)
 
 	tok, err := h.Config.Exchange(context.Background(), code)
 	if err != nil {

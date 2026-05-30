@@ -13,8 +13,12 @@ import (
 	"github.com/dance/plego/core"
 	"github.com/dance/plego/internal/filter/deduped"
 	"github.com/dance/plego/internal/filter/html2text"
+	yaqqlefilter "github.com/dance/plego/internal/filter/yaqqle"
 	"github.com/dance/plego/internal/publish/googledrive"
+	pubjson "github.com/dance/plego/internal/publish/json"
+	pubsql "github.com/dance/plego/internal/publish/sql"
 	"github.com/dance/plego/internal/subscription/googledrivesub"
+	yamlsub "github.com/dance/plego/internal/subscription/yaml"
 	"github.com/dance/plego/plugins/output/gmail"
 	"github.com/dance/plego/plugins/source/filesystem"
 	"github.com/dance/plego/state"
@@ -125,12 +129,20 @@ func buildPlugin(pc config.PluginConfig, store core.StateStore) (interface{}, er
 			stringValue(cfg, "credentials"),
 		)
 
+	case "Subscription::YAML":
+		return &yamlsub.Subscription{
+			Path: stringValue(cfg, "path"),
+		}, nil
+
 	// Filters
 	case "Filter::HTML2Text":
 		return html2text.New(), nil
 
 	case "Filter::Deduped":
 		return deduped.New(store), nil
+
+	case "Filter::YaQQle":
+		return yaqqlefilter.New(), nil
 
 	// Publishes
 	case "Publish::Gmail":
@@ -152,6 +164,17 @@ func buildPlugin(pc config.PluginConfig, store core.StateStore) (interface{}, er
 			stringValue(cfg, "extension"),
 			stringValue(cfg, "credentials"),
 		)
+
+	case "Publish::SQL":
+		return &pubsql.Publish{
+			OutDir: stringValue(cfg, "outdir"),
+		}, nil
+
+	case "Publish::JSON":
+		return &pubjson.Publish{
+			OutDir: stringValue(cfg, "outdir"),
+			Schema: stringValue(cfg, "schema") == "true",
+		}, nil
 
 	default:
 		return nil, fmt.Errorf("unknown module: %s", pc.Module)

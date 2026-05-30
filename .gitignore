@@ -1,0 +1,4 @@
+*.exe
+credentials.json
+~/.plego/
+state.db
