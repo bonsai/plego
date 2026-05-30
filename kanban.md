@@ -20,9 +20,10 @@
 
 ## Done
 
-## Icebox
+## Under Consideration
 
-| Title | Notes |
-|-------|-------|
-| Web UI dashboard | Real-time pipeline status |
-| Prometheus metrics | Feed processing latency, counts |
+| Title | ADR | Notes |
+|-------|-----|-------|
+| Codebase → OpenAPI → Spec pipeline | ADR-001 | Go source → OpenAPI 3.1 → yaml/json/markdown |
+| Web UI dashboard | | Real-time pipeline status |
+| Prometheus metrics | | Feed processing latency, counts |
