@@ -7,26 +7,18 @@ import (
 )
 
 type Config struct {
-	Pipeline PipelineConfig `yaml:"pipeline"`
+	Global  GlobalConfig  `yaml:"global"`
+	Plugins []PluginConfig `yaml:"plugins"`
 }
 
-type PipelineConfig struct {
-	Source  SourceConfig   `yaml:"source"`
-	Outputs []OutputConfig `yaml:"outputs"`
-	StateDB string         `yaml:"state_db"`
+type GlobalConfig struct {
+	Timezone string `yaml:"timezone"`
+	StateDB  string `yaml:"state_db"`
 }
 
-type SourceConfig struct {
-	Module     string   `yaml:"module"`
-	Path       string   `yaml:"path"`
-	Extensions []string `yaml:"extensions"`
-}
-
-type OutputConfig struct {
-	Module      string `yaml:"module"`
-	To          string `yaml:"to"`
-	Credentials string `yaml:"credentials"`
-	Token       string `yaml:"token"`
+type PluginConfig struct {
+	Module string                 `yaml:"module"`
+	Config map[string]interface{} `yaml:"config,omitempty"`
 }
 
 func Load(path string) (*Config, error) {

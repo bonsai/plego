@@ -10,20 +10,20 @@ import (
 	"github.com/dance/plego/core"
 )
 
-type Source struct {
+type Subscription struct {
 	Path       string
-	Extensions []string // e.g. [".md", ".txt"]
+	Extensions []string
 }
 
-func (s *Source) Name() string { return "filesystem" }
+func (s *Subscription) Name() string { return "Subscription::Filesystem" }
 
-func (s *Source) Items(_ context.Context) ([]core.Item, error) {
+func (s *Subscription) Fetch(_ context.Context) ([]*core.Feed, error) {
 	exts := s.Extensions
 	if len(exts) == 0 {
 		exts = []string{".md", ".txt"}
 	}
 
-	var items []core.Item
+	var entries []*core.Entry
 	err := filepath.WalkDir(s.Path, func(path string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
@@ -37,19 +37,27 @@ func (s *Source) Items(_ context.Context) ([]core.Item, error) {
 			return err
 		}
 
-		items = append(items, core.Item{
-			ID:    path,
+		entries = append(entries, &core.Entry{
+			GUID:  path,
 			Title: title(path, string(body)),
 			Body:  string(body),
+			URL:   path,
 		})
 		return nil
 	})
 
-	return items, err
+	if err != nil {
+		return nil, err
+	}
+
+	return []*core.Feed{{
+		GUID:    "filesystem:" + s.Path,
+		Title:   "Filesystem: " + s.Path,
+		Entries: entries,
+	}}, nil
 }
 
 func title(path, body string) string {
-	// first non-empty line, stripped of markdown heading markers
 	for _, line := range strings.SplitN(body, "\n", 20) {
 		line = strings.TrimSpace(strings.TrimLeft(line, "# "))
 		if line != "" {
@@ -58,3 +66,5 @@ func title(path, body string) string {
 	}
 	return filepath.Base(path)
 }
+
+var _ core.Subscription = (*Subscription)(nil)

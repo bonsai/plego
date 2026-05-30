@@ -1,13 +1,14 @@
-pipeline:
-  source:
-    module: filesystem
-    path: G:/My Drive/wiki
-    extensions: [.md, .txt]
+global:
+  timezone: Asia/Tokyo
+  state_db: ~/.plego/state.db
 
-  outputs:
-    - module: gmail
+plugins:
+  - module: Subscription::Filesystem
+    config:
+      path: G:/My Drive/wiki
+      extensions: [.md, .txt]
+
+  - module: Publish::Gmail
+    config:
       to: onsen.bonsai@gmail.com
       credentials: ./credentials.json
-      token: ~/.plego/gmail-token.json
-
-  state_db: ~/.plego/state.db

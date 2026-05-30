@@ -2,20 +2,34 @@ package core
 
 import "context"
 
-type Item struct {
-	ID    string // dedup key (e.g. filepath or hash)
+type Feed struct {
+	GUID    string
+	Title   string
+	URL     string
+	Content string
+	Entries []*Entry
+}
+
+type Entry struct {
+	GUID  string
 	Title string
+	URL   string
 	Body  string
 }
 
-type Source interface {
+type Subscription interface {
 	Name() string
-	Items(ctx context.Context) ([]Item, error)
+	Fetch(ctx context.Context) ([]*Feed, error)
 }
 
-type Output interface {
+type Filter interface {
 	Name() string
-	Publish(ctx context.Context, item Item) error
+	Filter(ctx context.Context, entry *Entry) (*Entry, error)
+}
+
+type Publish interface {
+	Name() string
+	Publish(ctx context.Context, entry *Entry) error
 }
 
 type StateStore interface {
