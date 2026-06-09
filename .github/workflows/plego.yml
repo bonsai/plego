@@ -1,0 +1,98 @@
+# Plagger プラグインパイプ (Go 実装 = plego)
+#   subscription → [filter] → publish
+# 本家 Plagger の config 思想をそのまま踏襲。モジュール名は Plagger 表記で対応付け:
+#   Subscription::Config / Subscription::Feed  →  source.module: filesystem
+#   Publish::Gmail                             →  outputs[].module: gmail
+name: plagger-pipe (plego)
+
+on:
+  push:
+    branches: [main, "ci/plego-action"]
+  workflow_dispatch:
+  schedule:
+    # 毎日 09:00 JST (00:00 UTC) にプラグインパイプを回す
+    - cron: '0 0 * * *'
+
+jobs:
+  plugin-pipe:
+    runs-on: ubuntu-latest
+    # Publish::Gmail 用の任意シークレット（未設定なら publish フェーズはスキップ）
+    env:
+      GMAIL_CREDENTIALS: ${{ secrets.GMAIL_CREDENTIALS }}
+      GMAIL_TOKEN: ${{ secrets.GMAIL_TOKEN }}
+      GMAIL_TO: ${{ secrets.GMAIL_TO }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go (Plagger エンジン本体)
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Bootstrap (Plagger->bootstrap 相当 / build)
+        run: go build ./...
+
+      - name: Lint plugins (go vet)
+        run: go vet ./...
+
+      - name: Plugin test suite (non-blocking)
+        continue-on-error: true
+        run: go test ./...
+
+      - name: Subscription::Config — feed をセット
+        run: |
+          mkdir -p inbox
+          printf '# Hello plagger\n\nプラグインパイプを流れる最初のエントリ。\n' > inbox/hello.md
+          printf '# Second entry\n\n2 回目の run では state により dedup される。\n' > inbox/second.md
+          ls -la inbox
+
+      - name: config.yaml を書き出し (subscription -> publish)
+        run: |
+          cat > plagger.ci.yaml <<'YAML'
+          # Plagger config (plego 形式)
+          pipeline:
+            # --- Subscription フェーズ (Subscription::Config 相当) ---
+            source:
+              module: filesystem        # = Subscription::Config / Feed
+              path: ./inbox
+              extensions: [.md, .txt]
+            # --- Publish フェーズ ---
+            outputs: []                 # シークレット無し run では publish 先なし(=Publish::Debug 相当の素通し)
+            state_db: ./ci-state.db     # 既読管理 (Plagger の DataDumper/Cache 相当)
+          YAML
+          cat plagger.ci.yaml
+
+      - name: プラグインパイプ実行 (1st pass — 全エントリ publish)
+        run: go run ./cmd/plego -config plagger.ci.yaml
+
+      - name: プラグインパイプ実行 (2nd pass — state で全 skip)
+        run: go run ./cmd/plego -config plagger.ci.yaml
+
+      - name: Publish::Gmail (任意 — secrets 設定時のみ)
+        if: env.GMAIL_CREDENTIALS != '' && env.GMAIL_TOKEN != ''
+        run: |
+          printf '%s' "$GMAIL_CREDENTIALS" > credentials.json
+          printf '%s' "$GMAIL_TOKEN" > gmail-token.json
+          cat > plagger.gmail.yaml <<YAML
+          pipeline:
+            source:
+              module: filesystem
+              path: ./inbox
+              extensions: [.md, .txt]
+            outputs:
+              - module: gmail          # = Publish::Gmail
+                to: ${GMAIL_TO:-onsen.bonsai@gmail.com}
+                credentials: ./credentials.json
+                token: ./gmail-token.json
+            state_db: ./gmail-state.db
+          YAML
+          go run ./cmd/plego -config plagger.gmail.yaml
+
+      - name: state DB を artifact 化
+        uses: actions/upload-artifact@v4
+        with:
+          name: plagger-state
+          path: ci-state.db
+          if-no-files-found: warn
