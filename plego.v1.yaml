@@ -1,5 +1,5 @@
-# アクティブ設定。現在は v0 と同じ内容。
-# v1 に切り替える場合: cp plego.v1.yaml plego.yaml && git commit
+# v1: iCal + メール日次ダイジェスト。認証なし（SMTP App Password のみ）。
+# Secrets: GMAIL_USER, GMAIL_APP_PASSWORD
 pipeline:
   state_db: state/state.db
 
@@ -23,3 +23,10 @@ pipeline:
   outputs:
     - module: ical
       output_path: docs/calendar.ics
+
+    - module: smtp
+      # from / password は GMAIL_USER / GMAIL_APP_PASSWORD 環境変数で上書き可
+      to:
+        - molotm777@gmail.com
+      bcc:
+        - mitsubachi.shouji@gmail.com

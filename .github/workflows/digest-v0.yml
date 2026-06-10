@@ -1,0 +1,36 @@
+name: Digest v0 – iCal only
+
+on:
+  schedule:
+    - cron: '0 22 * * *'   # JST 07:00
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go mod tidy
+      - run: go build ./...
+
+      - name: Run
+        run: go run ./cmd/plego -config plego.v0.yaml
+
+      - name: Commit
+        run: |
+          git config user.name  "plego-bot"
+          git config user.email "actions@github.com"
+          git add state/state.db docs/calendar.ics
+          git diff --staged --quiet || git commit -m "chore: v0 digest state [skip ci]"
+          git push

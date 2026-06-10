@@ -1,0 +1,37 @@
+name: Digest v1 – iCal + Mail
+
+on:
+  workflow_dispatch:   # v1 は手動トリガーのみ（v0 から昇格したら schedule に切り替える）
+
+permissions:
+  contents: write
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go mod tidy
+      - run: go build ./...
+
+      - name: Run
+        run: go run ./cmd/plego -config plego.v1.yaml
+        env:
+          GMAIL_USER:         ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+
+      - name: Commit
+        run: |
+          git config user.name  "plego-bot"
+          git config user.email "actions@github.com"
+          git add state/state.db docs/calendar.ics
+          git diff --staged --quiet || git commit -m "chore: v1 digest state [skip ci]"
+          git push

@@ -1,0 +1,35 @@
+# v2: iCal + メール + Google Calendar API 直接登録。OAuth2 認証あり。
+# Secrets: GMAIL_USER, GMAIL_APP_PASSWORD, GOOGLE_CALENDAR_CREDENTIALS, GOOGLE_CALENDAR_ID
+pipeline:
+  state_db: state/state.db
+
+  source:
+    module: prtimes
+    keywords:
+      - 試食会
+      - 発表会
+      - プレス発表会
+      - メディア発表会
+    industries:
+      - レストラン
+      - カフェ
+      - ホテル
+      - 食品
+      - 飲食
+      - ビストロ
+      - バー
+      - 居酒屋
+
+  outputs:
+    - module: ical
+      output_path: docs/calendar.ics
+
+    - module: smtp
+      to:
+        - molotm777@gmail.com
+      bcc:
+        - mitsubachi.shouji@gmail.com
+
+    - module: gcal
+      # GOOGLE_CALENDAR_CREDENTIALS: base64 encoded service account JSON
+      # GOOGLE_CALENDAR_ID: target calendar id (default: primary)

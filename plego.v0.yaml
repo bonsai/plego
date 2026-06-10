@@ -1,5 +1,5 @@
-# アクティブ設定。現在は v0 と同じ内容。
-# v1 に切り替える場合: cp plego.v1.yaml plego.yaml && git commit
+# v0: iCal フィードのみ。認証なし・メールなし。
+# 購読URL: https://bonsai.github.io/plego/calendar.ics
 pipeline:
   state_db: state/state.db
 
