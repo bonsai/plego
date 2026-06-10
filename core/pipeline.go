@@ -32,13 +32,21 @@ func (p *Pipeline) Run(ctx context.Context) error {
 				log.Printf("[%s] publish error for %q: %v", out.Name(), item.Title, err)
 				continue
 			}
-			log.Printf("[%s] published: %s", out.Name(), item.Title)
 		}
 
 		if err := p.State.MarkSent(item.ID); err != nil {
 			log.Printf("state update error: %v", err)
 		}
 		sent++
+	}
+
+	// Flush batch outputs (digest email, iCal) after all items are processed.
+	for _, out := range p.Outputs {
+		if f, ok := out.(Flusher); ok {
+			if err := f.Flush(ctx); err != nil {
+				log.Printf("[%s] flush error: %v", out.Name(), err)
+			}
+		}
 	}
 
 	log.Printf("done: %d sent, %d skipped", sent, skipped)

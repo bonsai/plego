@@ -1,13 +1,30 @@
 pipeline:
+  state_db: state/state.db
+
   source:
-    module: filesystem
-    path: G:/My Drive/wiki
-    extensions: [.md, .txt]
+    module: prtimes
+    keywords:
+      - 試食会
+      - 発表会
+      - プレス発表会
+      - メディア発表会
+    industries:
+      - レストラン
+      - カフェ
+      - ホテル
+      - 食品
+      - 飲食
+      - ビストロ
+      - バー
+      - 居酒屋
 
   outputs:
-    - module: gmail
-      to: onsen.bonsai@gmail.com
-      credentials: ./credentials.json
-      token: ~/.plego/gmail-token.json
+    - module: smtp
+      # from / password は GMAIL_USER / GMAIL_APP_PASSWORD 環境変数で上書き可
+      to:
+        - molotm777@gmail.com
+      bcc:
+        - mitsubachi.shouji@gmail.com
 
-  state_db: ~/.plego/state.db
+    - module: ical
+      output_path: docs/calendar.ics

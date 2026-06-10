@@ -10,7 +10,10 @@ import (
 	"github.com/dance/plego/config"
 	"github.com/dance/plego/core"
 	"github.com/dance/plego/plugins/output/gmail"
+	"github.com/dance/plego/plugins/output/ical"
+	"github.com/dance/plego/plugins/output/smtp"
 	"github.com/dance/plego/plugins/source/filesystem"
+	"github.com/dance/plego/plugins/source/prtimes"
 	"github.com/dance/plego/state"
 )
 
@@ -26,6 +29,9 @@ func main() {
 	stateDB := cfg.Pipeline.StateDB
 	if stateDB == "" {
 		stateDB = filepath.Join(os.Getenv("USERPROFILE"), ".plego", "state.db")
+		if os.Getenv("USERPROFILE") == "" {
+			stateDB = filepath.Join(os.Getenv("HOME"), ".plego", "state.db")
+		}
 	}
 
 	store, err := state.Open(stateDB)
@@ -50,8 +56,7 @@ func main() {
 
 	ctx := context.Background()
 
-	// OAUTH: Initialize authentication for all plugins that need it
-	log.Println(">> initializing authentication...")
+	// Initialize auth for plugins that need it (gmail legacy, v2 calendar, etc.).
 	if src != nil {
 		if auth, ok := src.(core.Authorizer); ok {
 			if err := auth.InitAuth(ctx); err != nil {
@@ -73,7 +78,6 @@ func main() {
 		State:   store,
 	}
 
-	// DO APP: Run the pipeline
 	log.Println(">> starting pipeline...")
 	if err := pipeline.Run(ctx); err != nil {
 		log.Fatalf("pipeline: %v", err)
@@ -82,6 +86,11 @@ func main() {
 
 func buildSource(cfg config.SourceConfig) (core.Source, error) {
 	switch cfg.Module {
+	case "prtimes":
+		return &prtimes.Source{
+			Keywords:   cfg.Keywords,
+			Industries: cfg.Industries,
+		}, nil
 	case "filesystem":
 		return &filesystem.Source{
 			Path:       cfg.Path,
@@ -95,15 +104,27 @@ func buildSource(cfg config.SourceConfig) (core.Source, error) {
 
 func buildOutput(cfg config.OutputConfig) (core.Output, error) {
 	switch cfg.Module {
+	case "smtp":
+		return &smtp.Output{
+			From:     cfg.From,
+			Password: cfg.Password,
+			To:       cfg.To,
+			BCC:      cfg.BCC,
+			Subject:  cfg.Subject,
+		}, nil
+	case "ical":
+		return &ical.Output{
+			OutputPath: cfg.OutputPath,
+		}, nil
 	case "gmail":
-		token := cfg.Token
-		if token == "" {
-			token = filepath.Join(os.Getenv("USERPROFILE"), ".plego", "gmail-token.json")
+		tokenPath := cfg.Token
+		if tokenPath == "" {
+			tokenPath = filepath.Join(os.Getenv("HOME"), ".plego", "gmail-token.json")
 		}
 		return &gmail.Output{
-			To:              cfg.To,
+			To:              cfg.To[0],
 			CredentialsFile: cfg.Credentials,
-			TokenFile:       token,
+			TokenFile:       tokenPath,
 		}, nil
 	default:
 		log.Fatalf("unknown output module: %s", cfg.Module)

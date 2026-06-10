@@ -1,11 +1,18 @@
 package core
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type Item struct {
-	ID    string // dedup key (e.g. filepath or hash)
-	Title string
-	Body  string
+	ID          string
+	Title       string
+	Body        string
+	URL         string
+	PublishedAt time.Time
+	EventAt     *time.Time
+	Location    string
 }
 
 type Source interface {
@@ -16,6 +23,12 @@ type Source interface {
 type Output interface {
 	Name() string
 	Publish(ctx context.Context, item Item) error
+}
+
+// Flusher is implemented by outputs that batch items (digest email, iCal file).
+// Pipeline.Run calls Flush after all items are published.
+type Flusher interface {
+	Flush(ctx context.Context) error
 }
 
 type StateStore interface {

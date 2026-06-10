@@ -17,14 +17,26 @@ type PipelineConfig struct {
 }
 
 type SourceConfig struct {
-	Module     string   `yaml:"module"`
+	Module string `yaml:"module"`
+	// prtimes
+	Keywords   []string `yaml:"keywords"`
+	Industries []string `yaml:"industries"`
+	// filesystem (legacy)
 	Path       string   `yaml:"path"`
 	Extensions []string `yaml:"extensions"`
 }
 
 type OutputConfig struct {
-	Module      string `yaml:"module"`
-	To          string `yaml:"to"`
+	Module string `yaml:"module"`
+	// smtp
+	From     string   `yaml:"from"`
+	Password string   `yaml:"password"`
+	To       []string `yaml:"to"`
+	BCC      []string `yaml:"bcc"`
+	Subject  string   `yaml:"subject"`
+	// ical
+	OutputPath string `yaml:"output_path"`
+	// gmail legacy oauth
 	Credentials string `yaml:"credentials"`
 	Token       string `yaml:"token"`
 }

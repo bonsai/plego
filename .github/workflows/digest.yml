@@ -1,0 +1,42 @@
+name: Daily Food Event Digest
+
+on:
+  schedule:
+    - cron: '0 22 * * *'   # JST 07:00
+  workflow_dispatch:         # manual trigger / test run
+
+permissions:
+  contents: write
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Resolve dependencies
+        run: go mod tidy
+
+      - name: Build
+        run: go build ./...
+
+      - name: Run digest
+        run: go run ./cmd/plego -config plego.yaml
+        env:
+          GMAIL_USER:         ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+
+      - name: Commit state and calendar
+        run: |
+          git config user.name  "plego-bot"
+          git config user.email "actions@github.com"
+          git add state/state.db docs/calendar.ics
+          git diff --staged --quiet || git commit -m "chore: daily digest state [skip ci]"
+          git push
