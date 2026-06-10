@@ -9,8 +9,10 @@ import (
 
 	"github.com/dance/plego/config"
 	"github.com/dance/plego/core"
+	"github.com/dance/plego/plugins/filter/yotei"
 	"github.com/dance/plego/plugins/output/gmail"
 	"github.com/dance/plego/plugins/output/ical"
+	"github.com/dance/plego/plugins/output/jsonfile"
 	"github.com/dance/plego/plugins/output/smtp"
 	"github.com/dance/plego/plugins/source/filesystem"
 	"github.com/dance/plego/plugins/source/prtimes"
@@ -46,6 +48,15 @@ func main() {
 		log.Fatalf("source: %v", err)
 	}
 
+	var filters []core.Filter
+	for _, fc := range cfg.Pipeline.Filters {
+		f, err := buildFilter(fc)
+		if err != nil {
+			log.Fatalf("filter: %v", err)
+		}
+		filters = append(filters, f)
+	}
+
 	var outputs []core.Output
 	for _, outCfg := range cfg.Pipeline.Outputs {
 		out, err := buildOutput(outCfg)
@@ -74,6 +85,7 @@ func main() {
 
 	pipeline := &core.Pipeline{
 		Source:  src,
+		Filters: filters,
 		Outputs: outputs,
 		State:   store,
 	}
@@ -102,6 +114,16 @@ func buildSource(cfg config.SourceConfig) (core.Source, error) {
 	}
 }
 
+func buildFilter(cfg config.FilterConfig) (core.Filter, error) {
+	switch cfg.Module {
+	case "yotei":
+		return &yotei.Filter{}, nil
+	default:
+		log.Fatalf("unknown filter module: %s", cfg.Module)
+		return nil, nil
+	}
+}
+
 func buildOutput(cfg config.OutputConfig) (core.Output, error) {
 	switch cfg.Module {
 	case "smtp":
@@ -114,6 +136,10 @@ func buildOutput(cfg config.OutputConfig) (core.Output, error) {
 		}, nil
 	case "ical":
 		return &ical.Output{
+			OutputPath: cfg.OutputPath,
+		}, nil
+	case "json":
+		return &jsonfile.Output{
 			OutputPath: cfg.OutputPath,
 		}, nil
 	case "gmail":

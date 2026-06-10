@@ -12,6 +12,7 @@ type Config struct {
 
 type PipelineConfig struct {
 	Source  SourceConfig   `yaml:"source"`
+	Filters []FilterConfig `yaml:"filters"`
 	Outputs []OutputConfig `yaml:"outputs"`
 	StateDB string         `yaml:"state_db"`
 }
@@ -26,6 +27,10 @@ type SourceConfig struct {
 	Extensions []string `yaml:"extensions"`
 }
 
+type FilterConfig struct {
+	Module string `yaml:"module"`
+}
+
 type OutputConfig struct {
 	Module string `yaml:"module"`
 	// smtp
@@ -34,7 +39,7 @@ type OutputConfig struct {
 	To       []string `yaml:"to"`
 	BCC      []string `yaml:"bcc"`
 	Subject  string   `yaml:"subject"`
-	// ical
+	// ical / json
 	OutputPath string `yaml:"output_path"`
 	// gmail legacy oauth
 	Credentials string `yaml:"credentials"`

@@ -1,4 +1,4 @@
-# アクティブ設定。現在は v0 と同じ内容。
+# アクティブ設定。現在は v0 と同内容。
 # v1 に切り替える場合: cp plego.v1.yaml plego.yaml && git commit
 pipeline:
   state_db: state/state.db
@@ -20,6 +20,12 @@ pipeline:
       - バー
       - 居酒屋
 
+  filters:
+    - module: yotei
+
   outputs:
     - module: ical
       output_path: docs/calendar.ics
+
+    - module: json
+      output_path: docs/feed.json

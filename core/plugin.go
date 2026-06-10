@@ -20,13 +20,18 @@ type Source interface {
 	Items(ctx context.Context) ([]Item, error)
 }
 
+// Filter keeps or drops items before they reach outputs.
+type Filter interface {
+	Name() string
+	Keep(item Item) bool
+}
+
 type Output interface {
 	Name() string
 	Publish(ctx context.Context, item Item) error
 }
 
-// Flusher is implemented by outputs that batch items (digest email, iCal file).
-// Pipeline.Run calls Flush after all items are published.
+// Flusher is implemented by outputs that batch items (digest email, iCal, JSON).
 type Flusher interface {
 	Flush(ctx context.Context) error
 }
