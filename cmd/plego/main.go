@@ -28,10 +28,11 @@ func main() {
 
 	stateDB := cfg.Pipeline.StateDB
 	if stateDB == "" {
-		stateDB = filepath.Join(os.Getenv("USERPROFILE"), ".plego", "state.db")
-		if os.Getenv("USERPROFILE") == "" {
-			stateDB = filepath.Join(os.Getenv("HOME"), ".plego", "state.db")
+		home := os.Getenv("HOME")
+		if home == "" {
+			home = os.Getenv("USERPROFILE")
 		}
+		stateDB = filepath.Join(home, ".plego", "state.db")
 	}
 
 	store, err := state.Open(stateDB)
@@ -56,7 +57,6 @@ func main() {
 
 	ctx := context.Background()
 
-	// Initialize auth for plugins that need it (gmail legacy, v2 calendar, etc.).
 	if src != nil {
 		if auth, ok := src.(core.Authorizer); ok {
 			if err := auth.InitAuth(ctx); err != nil {
@@ -117,9 +117,16 @@ func buildOutput(cfg config.OutputConfig) (core.Output, error) {
 			OutputPath: cfg.OutputPath,
 		}, nil
 	case "gmail":
+		if len(cfg.To) == 0 {
+			log.Fatalf("gmail output: 'to' must have at least one address")
+		}
 		tokenPath := cfg.Token
 		if tokenPath == "" {
-			tokenPath = filepath.Join(os.Getenv("HOME"), ".plego", "gmail-token.json")
+			home := os.Getenv("HOME")
+			if home == "" {
+				home = os.Getenv("USERPROFILE")
+			}
+			tokenPath = filepath.Join(home, ".plego", "gmail-token.json")
 		}
 		return &gmail.Output{
 			To:              cfg.To[0],

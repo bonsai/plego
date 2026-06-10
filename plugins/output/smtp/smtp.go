@@ -3,6 +3,7 @@ package smtp
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"html/template"
 	"log"
@@ -77,9 +78,7 @@ func (o *Output) Flush(ctx context.Context) error {
 			time.Now().Format("2006-01-02"), len(o.pending))
 	}
 
-	allTo := append([]string{}, o.To...)
-	allTo = append(allTo, o.BCC...)
-
+	allTo := append(append([]string{}, o.To...), o.BCC...)
 	msg := buildMIME(from, o.To, o.BCC, subject, body)
 
 	auth := gosmtp.PlainAuth("", from, password, "smtp.gmail.com")
@@ -115,57 +114,20 @@ func buildMIME(from string, to, bcc []string, subject, htmlBody string) []byte {
 	if len(bcc) > 0 {
 		b.WriteString(fmt.Sprintf("Bcc: %s\r\n", strings.Join(bcc, ", ")))
 	}
-	b.WriteString(fmt.Sprintf("Subject: =?UTF-8?B?%s?=\r\n", encodeB64(subject)))
+	enc := base64.StdEncoding.EncodeToString([]byte(subject))
+	b.WriteString(fmt.Sprintf("Subject: =?UTF-8?B?%s?=\r\n", enc))
 	b.WriteString(fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"%s\"\r\n\r\n", boundary))
 
-	// plain text fallback
 	b.WriteString(fmt.Sprintf("--%s\r\n", boundary))
 	b.WriteString("Content-Type: text/plain; charset=UTF-8\r\n\r\n")
-	b.WriteString("このメールは HTML 対応のメールクライアントでご確認ください。\r\n")
+	b.WriteString("このメールは HTML 対応クライアントでご確認ください。\r\n")
 
-	// HTML part
 	b.WriteString(fmt.Sprintf("\r\n--%s\r\n", boundary))
 	b.WriteString("Content-Type: text/html; charset=UTF-8\r\n\r\n")
 	b.WriteString(htmlBody)
 	b.WriteString(fmt.Sprintf("\r\n--%s--\r\n", boundary))
 
 	return b.Bytes()
-}
-
-func encodeB64(s string) string {
-	import64 := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-	_ = import64
-	// Use standard library encoding
-	return encodeBase64Std([]byte(s))
-}
-
-func encodeBase64Std(b []byte) string {
-	const table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-	var buf bytes.Buffer
-	for i := 0; i < len(b); i += 3 {
-		end := i + 3
-		if end > len(b) {
-			end = len(b)
-		}
-		chunk := b[i:end]
-		var val uint32
-		for j, c := range chunk {
-			val |= uint32(c) << (16 - j*8)
-		}
-		buf.WriteByte(table[(val>>18)&0x3F])
-		buf.WriteByte(table[(val>>12)&0x3F])
-		if len(chunk) > 1 {
-			buf.WriteByte(table[(val>>6)&0x3F])
-		} else {
-			buf.WriteByte('=')
-		}
-		if len(chunk) > 2 {
-			buf.WriteByte(table[val&0x3F])
-		} else {
-			buf.WriteByte('=')
-		}
-	}
-	return buf.String()
 }
 
 func envOrVal(val, envKey string) string {
