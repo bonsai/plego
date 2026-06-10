@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	baseURL   = "https://prtimes.jp"
-	crawlWait = time.Second
+	baseURL      = "https://prtimes.jp"
+	searchFormat = "%s/topics/keywords/%s"
+	crawlWait    = time.Second
 )
 
 type Source struct {
@@ -45,6 +46,7 @@ func (s *Source) Items(ctx context.Context) ([]core.Item, error) {
 			log.Printf("[prtimes] search %q: %v", kw, err)
 			continue
 		}
+		log.Printf("[prtimes] %q: %d results", kw, len(results))
 		for _, item := range results {
 			if seen[item.ID] {
 				continue
@@ -59,8 +61,7 @@ func (s *Source) Items(ctx context.Context) ([]core.Item, error) {
 }
 
 func (s *Source) search(ctx context.Context, keyword string) ([]core.Item, error) {
-	searchURL := fmt.Sprintf("%s/main/html/searchrlp/key/%s",
-		baseURL, url.PathEscape(keyword))
+	searchURL := fmt.Sprintf(searchFormat, baseURL, url.PathEscape(keyword))
 
 	req, err := http.NewRequestWithContext(ctx, "GET", searchURL, nil)
 	if err != nil {
@@ -94,7 +95,8 @@ func (s *Source) matchIndustry(item core.Item) bool {
 	return false
 }
 
-// parseSearchPage extracts articles from a PR TIMES HTML search result page.
+// parseSearchPage finds all press-release links on a PR TIMES keyword page.
+// Links match /main/html/rd/p/{digits}.{digits}.html
 func parseSearchPage(r io.Reader) ([]core.Item, error) {
 	doc, err := html.Parse(r)
 	if err != nil {
@@ -104,11 +106,10 @@ func parseSearchPage(r io.Reader) ([]core.Item, error) {
 	var items []core.Item
 	var walk func(*html.Node)
 	walk = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "article" {
-			if item, ok := extractItem(n); ok {
+		if n.Type == html.ElementNode && n.Data == "a" {
+			if item, ok := extractFromAnchor(n); ok {
 				items = append(items, item)
 			}
-			return
 		}
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
 			walk(c)
@@ -118,73 +119,97 @@ func parseSearchPage(r io.Reader) ([]core.Item, error) {
 	return items, nil
 }
 
-// extractItem pulls title/url/summary/date from an <article> node.
-func extractItem(n *html.Node) (core.Item, bool) {
-	link, title := findLink(n)
-	if link == "" {
+// extractFromAnchor builds an Item from a press-release <a> tag.
+func extractFromAnchor(n *html.Node) (core.Item, bool) {
+	href := attr(n, "href")
+	if !isArticleHref(href) {
 		return core.Item{}, false
 	}
-	// Resolve relative URLs.
-	if strings.HasPrefix(link, "/") {
-		link = baseURL + link
+	if strings.HasPrefix(href, "/") {
+		href = baseURL + href
 	}
 
-	summary := findText(n, "p")
-	dateStr := findAttr(n, "time", "datetime")
+	title := strings.TrimSpace(textContent(n))
+	if title == "" {
+		return core.Item{}, false
+	}
+
+	// Walk up to find a container with more context (date, summary).
+	container := parentN(n, 4)
+	summary := closestText(container, "p")
+	dateStr := closestAttr(container, "time", "datetime")
 	published := parseDate(dateStr)
 
-	id := itemID(link)
 	return core.Item{
-		ID:          id,
+		ID:          itemID(href),
 		Title:       title,
 		Body:        summary,
-		URL:         link,
+		URL:         href,
 		PublishedAt: published,
 	}, true
 }
 
-func findLink(n *html.Node) (href, text string) {
-	if n.Type == html.ElementNode && n.Data == "a" {
-		for _, a := range n.Attr {
-			if a.Key == "href" && strings.Contains(a.Val, "/main/html/rd/") {
-				return a.Val, strings.TrimSpace(textContent(n))
-			}
-		}
-	}
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		if h, t := findLink(c); h != "" {
-			return h, t
-		}
-	}
-	return "", ""
+func isArticleHref(href string) bool {
+	// e.g. /main/html/rd/p/000000030.000138935.html
+	return strings.Contains(href, "/main/html/rd/p/")
 }
 
-func findText(n *html.Node, tag string) string {
-	if n.Type == html.ElementNode && n.Data == tag {
-		return strings.TrimSpace(textContent(n))
-	}
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		if t := findText(c, tag); t != "" {
-			return t
+func attr(n *html.Node, key string) string {
+	for _, a := range n.Attr {
+		if a.Key == key {
+			return a.Val
 		}
 	}
 	return ""
 }
 
-func findAttr(n *html.Node, tag, attr string) string {
-	if n.Type == html.ElementNode && n.Data == tag {
-		for _, a := range n.Attr {
-			if a.Key == attr {
-				return a.Val
+func parentN(n *html.Node, levels int) *html.Node {
+	for i := 0; i < levels && n != nil; i++ {
+		n = n.Parent
+	}
+	return n
+}
+
+func closestText(n *html.Node, tag string) string {
+	if n == nil {
+		return ""
+	}
+	var walk func(*html.Node) string
+	walk = func(node *html.Node) string {
+		if node.Type == html.ElementNode && node.Data == tag {
+			if t := strings.TrimSpace(textContent(node)); t != "" {
+				return t
 			}
 		}
-	}
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		if v := findAttr(c, tag, attr); v != "" {
-			return v
+		for c := node.FirstChild; c != nil; c = c.NextSibling {
+			if t := walk(c); t != "" {
+				return t
+			}
 		}
+		return ""
 	}
-	return ""
+	return walk(n)
+}
+
+func closestAttr(n *html.Node, tag, key string) string {
+	if n == nil {
+		return ""
+	}
+	var walk func(*html.Node) string
+	walk = func(node *html.Node) string {
+		if node.Type == html.ElementNode && node.Data == tag {
+			if v := attr(node, key); v != "" {
+				return v
+			}
+		}
+		for c := node.FirstChild; c != nil; c = c.NextSibling {
+			if v := walk(c); v != "" {
+				return v
+			}
+		}
+		return ""
+	}
+	return walk(n)
 }
 
 func textContent(n *html.Node) string {
@@ -203,7 +228,7 @@ func textContent(n *html.Node) string {
 }
 
 func parseDate(s string) time.Time {
-	for _, layout := range []string{"2006-01-02T15:04:05Z07:00", "2006-01-02"} {
+	for _, layout := range []string{"2006-01-02T15:04:05Z07:00", "2006-01-02", "2006年1月2日"} {
 		if t, err := time.Parse(layout, s); err == nil {
 			return t
 		}

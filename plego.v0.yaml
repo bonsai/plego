@@ -1,6 +1,4 @@
-# v0: iCal + JSON フィード。認証なし・メールなし。
-# 購読URL: https://bonsai.github.io/plego/calendar.ics
-# JSON API:  https://bonsai.github.io/plego/feed.json
+# v0: iCal + JSON。認証なし・メールなし。
 pipeline:
   state_db: state/state.db
 
@@ -8,9 +6,6 @@ pipeline:
     module: prtimes
     keywords:
       - 試食会
-      - 発表会
-      - プレス発表会
-      - メディア発表会
     industries:
       - レストラン
       - カフェ
