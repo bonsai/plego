@@ -1,7 +1,7 @@
 name: Digest v1 – iCal + Mail
 
 on:
-  workflow_dispatch:   # v1 は手動トリガーのみ（v0 から昇格したら schedule に切り替える）
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -23,9 +23,9 @@ jobs:
       - run: go build ./...
 
       - name: Run
-        run: go run ./cmd/plego -config plego.v1.yaml
+        run: go run . -config recipe/plego.v1.yaml
         env:
-          GMAIL_USER:         ${{ secrets.GMAIL_USER }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
 
       - name: Commit

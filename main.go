@@ -20,7 +20,7 @@ import (
 )
 
 func main() {
-	cfgPath := flag.String("config", "plego.yaml", "config file")
+	cfgPath := flag.String("config", "recipe/plego.yaml", "config file")
 	flag.Parse()
 
 	cfg, err := config.Load(*cfgPath)

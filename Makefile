@@ -3,16 +3,16 @@
 build:
 	go build ./...
 
-# デフォルト実行 (plego.yaml = v0)
+# デフォルト実行 (recipe/plego.yaml = v0)
 run:
-	go run ./cmd/plego -config plego.yaml
+	go run . -config recipe/plego.yaml
 
 run-v0:
-	go run ./cmd/plego -config plego.v0.yaml
+	go run . -config recipe/plego.v0.yaml
 
 run-v1:
 	GMAIL_USER=$(GMAIL_USER) GMAIL_APP_PASSWORD=$(GMAIL_APP_PASSWORD) \
-		go run ./cmd/plego -config plego.v1.yaml
+		go run . -config recipe/plego.v1.yaml
 
 test:
 	go test ./...
